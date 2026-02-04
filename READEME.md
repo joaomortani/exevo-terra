@@ -73,3 +73,6 @@ terraform apply
 
 ## 🤝 Contribuindo
 Pull Requests são bem-vindos! Para mudanças maiores, abra uma issue primeiro para discutir o que você gostaria de mudar.
+
+## 📄 Licença
+MIT
