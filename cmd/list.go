@@ -1,4 +1,4 @@
-package rds
+package cmd
 
 import (
 	"fmt"
@@ -31,5 +31,5 @@ var listCmd = &cobra.Command{
 
 func init() {
 	// Registra o filho no pai
-	RdsCmd.AddCommand(listCmd)
+	//rootCmd.AddCommand(listCmd)
 }

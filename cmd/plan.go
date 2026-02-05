@@ -1,4 +1,4 @@
-package rds
+package cmd
 
 import (
 	"github.com/joaomortani/exevo-terra/internal/adapter"
@@ -22,5 +22,5 @@ var planCmd = &cobra.Command{
 }
 
 func init() {
-	RdsCmd.AddCommand(planCmd)
+	//rootCmd.AddCommand(planCmd)
 }
