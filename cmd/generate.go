@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/joaomortani/exevo-terra/internal/adapter"
@@ -42,6 +44,12 @@ var generateCmd = &cobra.Command{
 			for i, v := range instances {
 				rawList[i] = v
 			}
+		case "s3":
+			instances, err := provider.FetchBuckets(cmd.Context(), sharedAwsCfg)
+			if err != nil {
+				return err
+			}
+			rawList = instances
 
 		default:
 			return fmt.Errorf("provider '%s' ainda não implementado no código Go", resourceType)
@@ -76,9 +84,14 @@ var generateCmd = &cobra.Command{
 		// 6. Geração de Arquivos
 		fmt.Printf("🚀 Gerando Terraform para %d recursos...\n", len(filteredList))
 
+		outputDir := filepath.Join("infra", resourceType)
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("falha ao criar diretório: %w", err)
+		}
+
 		// Nomes de arquivo dinâmicos
-		outputFile := fmt.Sprintf("%s.tf", resourceType)
-		importFile := fmt.Sprintf("import_%s.tf", resourceType)
+		outputFile := filepath.Join(outputDir, "main.tf")
+		importFile := filepath.Join(outputDir, "imports.tf")
 
 		// Gera a Definição
 		if err := generator.GenerateGeneric(filteredList, resourceConfig, outputFile); err != nil {

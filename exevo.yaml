@@ -27,5 +27,24 @@ resources:
       terraform_managed: true
       environment: "production"
 
-      version: "1"
+  s3:
+    # Usando o módulo oficial da comunidade como exemplo
+    source: "terraform-aws-modules/s3-bucket/aws"
+    
+    # Campo que será usado como nome do módulo e ID de importação
+    primary_key: "Name" 
+    
+    # Endereço do recurso dentro do módulo (padrão do módulo oficial)
+    resource_address: "aws_s3_bucket.this" 
+
+    mappings:
+      # Variável do Terraform <= Campo da AWS (Case Sensitive!)
+      bucket: "Name"
+      
+    static:
+      # Valores que não vêm da API, mas queremos forçar
+      acl: "private"
+      control_object_ownership: true
+      object_ownership: "ObjectWriter"
+      versioning: { enabled: true } # Exemplo de map estático
   
