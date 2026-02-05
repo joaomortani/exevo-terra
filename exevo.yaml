@@ -1,0 +1,31 @@
+version: "1"
+
+resources:
+  rds:
+    # O módulo que será usado no output (Pode ser o da sua empresa ou oficial)
+    source: "./modules/rds-padrao"
+    
+    # Campo que será usado como identificador único do recurso (nome do módulo)
+    primary_key: "DBInstanceIdentifier"
+
+    resource_address: "aws_db_instance.this"
+
+    # Mapeamento: Variável do Terraform <= Campo da API AWS
+    # Lado Esquerdo: Nome da variável no variables.tf
+    # Lado Direito: Nome do campo retornado pela struct da AWS (Case Sensitive)
+    mappings:
+      identifier: "DBInstanceIdentifier"
+      engine: "Engine"
+      engine_version: "EngineVersion"
+      instance_class: "DBInstanceClass"
+      allocated_storage: "AllocatedStorage"
+      multi_az: "MultiAZ"
+      storage_type: "StorageType"
+
+    # Valores estáticos (opcionais, para coisas que não vêm da AWS)
+    static:
+      terraform_managed: true
+      environment: "production"
+
+      version: "1"
+  
