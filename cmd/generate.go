@@ -10,7 +10,6 @@ import (
 	"github.com/joaomortani/exevo-terra/internal/adapter"
 	"github.com/joaomortani/exevo-terra/internal/configuration"
 	"github.com/joaomortani/exevo-terra/internal/generator"
-	"github.com/joaomortani/exevo-terra/internal/provider"
 	"github.com/spf13/cobra"
 )
 
@@ -73,25 +72,7 @@ func loadConfig(resType string) (configuration.Resource, configuration.GlobalCon
 }
 
 func fetchResources(ctx context.Context, resType string) ([]interface{}, error) {
-	switch resType {
-	case "rds":
-		instances, err := provider.FetchRDSInstances(ctx, sharedAwsCfg)
-		if err != nil {
-			return nil, err
-		}
-
-		list := make([]interface{}, len(instances))
-		for i, v := range instances {
-			list[i] = v
-		}
-		return list, nil
-
-	case "s3":
-		return provider.FetchBuckets(ctx, sharedAwsCfg)
-
-	default:
-		return nil, fmt.Errorf("provider '%s' ainda não implementado via código", resType)
-	}
+	return FetchGenericResources(ctx, sharedAwsCfg, resType)
 }
 
 func applyFilter(list []adapter.ResourceData, key, filter string) []adapter.ResourceData {

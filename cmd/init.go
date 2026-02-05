@@ -52,10 +52,11 @@ global:
     type: "s3"
     config:
       bucket: "meu-bucket-terraform-state"
-      # {{RESOURCE}} é substituído dinamicamente pelo nome do recurso (ex: rds, s3)
+      # {{RESOURCE}} é substituído dinamicamente (ex: rds, s3, ec2)
       key: "exevo-terra/{{RESOURCE}}/terraform.tfstate"
       region: "us-east-1"
       encrypt: true
+      dynamodb_table: "terraform-lock"
 
   providers:
     aws:
@@ -64,45 +65,72 @@ global:
 
 # ------------------------------------------------------------------
 # 📦 RESOURCES CONFIGURATION
-# Mapeamento de recursos da AWS para Módulos Terraform
 # ------------------------------------------------------------------
 resources:
 
-  # Exemplo: Amazon RDS
+  # --- 🗄️ DATABASE (RDS) ---
   rds:
-    # Módulo Terraform que será utilizado (pode ser local ou do registry)
-    source: "./modules/rds-padrao"
-    
-    # Campo da API AWS usado como identificador único (Nome do Módulo)
+    source: "./modules/rds" # Aponte para seu módulo
     primary_key: "DBInstanceIdentifier"
-    
-    # Endereço do recurso dentro do módulo (para importação)
     resource_address: "aws_db_instance.this" 
-
-    # Mapeamento: Variável Terraform <= Campo AWS (Case Sensitive)
-    # Use 'exevo-terra inspect' para ver os campos disponíveis
+    
     mappings:
       identifier: "DBInstanceIdentifier"
       instance_class: "DBInstanceClass"
       engine: "Engine"
       allocated_storage: "AllocatedStorage"
+      
+      # ✨ Campos Enriquecidos (Exevo Terra Magic)
+      # O Exevo Terra achata listas complexas para facilitar sua vida:
+      vpc_security_group_ids: "SimpleSecurityGroupIds"
+      subnet_ids: "SimpleSubnetIds"
     
-    # Valores estáticos (forçados no código gerado)
     static:
       terraform_managed: true
-      environment: "production"
 
-  # Exemplo: Amazon S3
+  # --- 💻 COMPUTE (EC2) ---
+  ec2:
+    source: "terraform-aws-modules/ec2-instance/aws"
+    primary_key: "InstanceId"
+    resource_address: "aws_instance.this"
+    
+    mappings:
+      name: "Tags.Name" # Busca valor da tag Name automaticamente
+      instance_type: "InstanceType"
+      ami: "ImageId"
+      
+      # ✨ Campos Enriquecidos
+      vpc_security_group_ids: "SimpleSecurityGroupIds"
+      subnet_id: "SimpleSubnetId"
+    
+    static:
+      monitoring: true
+
+  # --- 🐳 CONTAINERS (ECS Service) ---
+  ecs:
+    source: "terraform-aws-modules/ecs/aws//modules/service"
+    primary_key: "ServiceName"
+    resource_address: "aws_ecs_service.this"
+    
+    mappings:
+      name: "ServiceName"
+      cluster_arn: "ClusterArn"
+      desired_count: "DesiredCount"
+      
+      # ✨ Campos Enriquecidos (Busca de Fargate/AwsvpcConfig)
+      subnet_ids: "SimpleSubnetIds"
+      security_group_ids: "SimpleSecurityGroupIds"
+    
+    static:
+      ignore_task_definition_changes: true
+
+  # --- ☁️ STORAGE (S3) ---
   s3:
     source: "terraform-aws-modules/s3-bucket/aws"
     primary_key: "Name"
     resource_address: "aws_s3_bucket.this"
-    
     mappings:
       bucket: "Name"
-    
     static:
       acl: "private"
-      control_object_ownership: true
-      object_ownership: "ObjectWriter"
 `
