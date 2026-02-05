@@ -29,7 +29,8 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	resourceType, _ := cmd.Flags().GetString("resource")
 	filter, _ := cmd.Flags().GetString("filter")
 
-	config, err := loadResourceConfig(resourceType)
+	config, globalConfig, err := loadConfig(resourceType)
+
 	if err != nil {
 		return err
 	}
@@ -39,31 +40,32 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	resourceDateList, err := adapter.BatchToMap(rawResources)
+	resourceDataList, err := adapter.BatchToMap(rawResources)
 	if err != nil {
 		return fmt.Errorf("erro ao adaptar recursos: %w", err)
 	}
 
-	filteredList := applyFilter(resourceDateList, config.PrimaryKey, filter)
+	filteredList := applyFilter(resourceDataList, config.PrimaryKey, filter)
 	if len(filteredList) == 0 {
 		return fmt.Errorf("nenhum recurso encontrado com o filtro '%s'", filter)
 	}
 
-	return writeOutput(filteredList, config, resourceType)
+	return writeOutput(filteredList, config, globalConfig, resourceType)
+
 }
 
-func loadResourceConfig(resType string) (configuration.Resource, error) {
+func loadConfig(resType string) (configuration.Resource, configuration.GlobalConfig, error) {
 	fmt.Println("📖 Lendo exevo.yaml...")
-	cfg, err := configuration.Load("exevo.yaml")
+	fullConfig, err := configuration.Load("exevo.yaml")
 	if err != nil {
-		return configuration.Resource{}, fmt.Errorf("falha ao ler config: %w", err)
+		return configuration.Resource{}, configuration.GlobalConfig{}, fmt.Errorf("falha ao ler config: %w", err)
+	}
+	resourceConfig, ok := fullConfig.Resources[resType]
+	if !ok {
+		return configuration.Resource{}, configuration.GlobalConfig{}, fmt.Errorf("recurso '%s' não encontrado", resType)
 	}
 
-	resConfig, ok := cfg.Resources[resType]
-	if !ok {
-		return configuration.Resource{}, fmt.Errorf("configuração '%s' não encontrada no exevo.yaml", resType)
-	}
-	return resConfig, nil
+	return resourceConfig, fullConfig.Global, nil
 }
 
 func fetchResources(ctx context.Context, resType string) ([]interface{}, error) {
@@ -105,7 +107,7 @@ func applyFilter(list []adapter.ResourceData, key, filter string) []adapter.Reso
 	return filtered
 }
 
-func writeOutput(list []adapter.ResourceData, config configuration.Resource, resType string) error {
+func writeOutput(list []adapter.ResourceData, config configuration.Resource, globalConfig configuration.GlobalConfig, resType string) error {
 	fmt.Printf("🚀 Gerando Terraform para %d recursos...\n", len(list))
 
 	outputDir := filepath.Join("infra", resType)
@@ -115,18 +117,24 @@ func writeOutput(list []adapter.ResourceData, config configuration.Resource, res
 
 	mainFile := filepath.Join(outputDir, "main.tf")
 	importsFile := filepath.Join(outputDir, "imports.tf")
+	versionsFile := filepath.Join(outputDir, "versions.tf")
 
 	// Gera Definição
 	if err := generator.GenerateGeneric(list, config, mainFile); err != nil {
-		return fmt.Errorf("erro ao gerar main.tf: %w", err)
+		return err
 	}
 
-	// Gera Imports
-	fmt.Println("🔗 Gerando Imports Dinâmicos...")
+	// Gera Imports (Igual)
 	if err := generator.GenerateGenericImport(list, config, importsFile); err != nil {
-		return fmt.Errorf("erro ao gerar imports.tf: %w", err)
+		return err
 	}
 
-	fmt.Printf("✅ Sucesso! Arquivos gerados:\n - %s\n - %s\n", mainFile, importsFile)
+	// Gera Versions (NOVO!) 🆕
+	fmt.Println("🏗️  Gerando Configuração Global (versions.tf)...")
+	if err := generator.GenerateVersions(globalConfig, resType, versionsFile); err != nil {
+		return fmt.Errorf("erro ao gerar versions.tf: %w", err)
+	}
+
+	fmt.Printf("✅ Sucesso! Arquivos gerados:\n - %s\n - %s\n - %s\n", mainFile, importsFile, versionsFile)
 	return nil
 }

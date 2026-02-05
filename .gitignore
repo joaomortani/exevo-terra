@@ -16,3 +16,5 @@ main
 *.env
 .env
 .tf
+infra/*
+infra/*/*.tf

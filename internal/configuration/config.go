@@ -9,7 +9,24 @@ import (
 
 type ExevoConfig struct {
 	Version   string              `yaml:"version"`
+	Global    GlobalConfig        `ymal:"global"`
 	Resources map[string]Resource `yaml:"resources"`
+}
+
+type GlobalConfig struct {
+	TerraformVersion string                    `yaml:"terraform_version"`
+	Backend          BackendConfig             `yaml:"backend"`
+	Providers        map[string]ProviderConfig `yaml:"providers"`
+}
+
+type BackendConfig struct {
+	Type   string                 `yaml:"type"`
+	Config map[string]interface{} `yaml:"config"`
+}
+
+type ProviderConfig struct {
+	Source  string `yaml:"source"`
+	Version string `yaml:"version"`
 }
 
 type Resource struct {
