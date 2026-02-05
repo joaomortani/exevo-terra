@@ -1,0 +1,38 @@
+name: Release & Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    # Opcional: só dispara se não for um push de tag (para evitar loop)
+    tags-ignore:
+      - '**'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necessário para ler o histórico de commits
+
+      - name: Calculate Next Version & Create Tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch # Se não houver 'feat' ou 'fix', sobe patch por padrão
+          release_branches: main
+          tag_prefix: v
+
+      - name: Create a GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          token: ${{ secrets.GITHUB_TOKEN }}
