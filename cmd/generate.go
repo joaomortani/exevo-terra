@@ -29,6 +29,10 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	resourceType, _ := cmd.Flags().GetString("resource")
 	filter, _ := cmd.Flags().GetString("filter")
 
+	if resourceType == "" {
+		return fmt.Errorf("a flag --resource é obrigatória. Ex: --resource rds")
+	}
+
 	config, globalConfig, err := loadConfig(resourceType)
 
 	if err != nil {

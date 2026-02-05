@@ -4,7 +4,6 @@ Copyright © 2026 NAME HERE contato@jao.dev.br
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"context"
@@ -44,10 +43,6 @@ to quickly create a Cobra application.`,
 		}
 		sharedAwsCfg = cfg
 
-		res, _ := cmd.Flags().GetString("resource")
-		if res == "" {
-			return fmt.Errorf("a flag --resource é obrigatória. Ex: --resource rds")
-		}
 		return nil
 	},
 }
