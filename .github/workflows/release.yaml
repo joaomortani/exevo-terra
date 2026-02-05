@@ -1,12 +1,9 @@
-name: Release & Version Bump
+name: Release
 
 on:
   push:
     branches:
       - main
-    # Opcional: só dispara se não for um push de tag (para evitar loop)
-    tags-ignore:
-      - '**'
 
 permissions:
   contents: write
@@ -15,24 +12,39 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Necessário para ler o histórico de commits
+          fetch-depth: 0
 
-      - name: Calculate Next Version & Create Tag
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5' 
+
+      # 1. Calcula a próxima versão baseada nos commits (feat/fix)
+      - name: Calculate Next Version
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch # Se não houver 'feat' ou 'fix', sobe patch por padrão
-          release_branches: main
+          default_bump: patch
+          dry_run: true 
+
+      # 2. Cria a Tag no Git (Obrigatório para o GoReleaser funcionar)
+      - name: Push Tag
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
           tag_prefix: v
 
-      - name: Create a GitHub Release
-        uses: ncipollo/release-action@v1
+      # 3. Compila e Publica os Binários
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          tag: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.tag_version.outputs.changelog }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
