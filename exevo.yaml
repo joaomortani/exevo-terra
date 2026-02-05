@@ -1,18 +1,30 @@
 version: "1"
 
+global:
+  terraform_version: ">= 1.5.0"
+
+  backend:
+      type: "s3"
+      config:
+        bucket: "meu-bucket-terraform-state-prod"
+        # O {{RESOURCE}} será trocado por "rds", "s3", etc.
+        key: "exevo/{{RESOURCE}}/terraform.tfstate"
+        region: "us-east-1"
+        encrypt: true
+        dynamodb_table: "terraform-lock"
+
+  providers:
+      aws:
+        source: "hashicorp/aws"
+        version: ">= 5.0"
+
+
 resources:
   rds:
     # O módulo que será usado no output (Pode ser o da sua empresa ou oficial)
     source: "./modules/rds-padrao"
-    
-    # Campo que será usado como identificador único do recurso (nome do módulo)
     primary_key: "DBInstanceIdentifier"
-
     resource_address: "aws_db_instance.this"
-
-    # Mapeamento: Variável do Terraform <= Campo da API AWS
-    # Lado Esquerdo: Nome da variável no variables.tf
-    # Lado Direito: Nome do campo retornado pela struct da AWS (Case Sensitive)
     mappings:
       identifier: "DBInstanceIdentifier"
       engine: "Engine"
