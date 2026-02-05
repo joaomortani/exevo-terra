@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,100 +17,116 @@ import (
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Gera código Terraform baseado no exevo.yaml",
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		resourceType, _ := cmd.Flags().GetString("resource")
-
-		fmt.Println("📖 Lendo exevo.yaml...")
-		config, err := configuration.Load("exevo.yaml")
-		if err != nil {
-			return fmt.Errorf("falha ao ler config: %w", err)
-		}
-
-		resourceConfig, ok := config.Resources[resourceType]
-		if !ok {
-			return fmt.Errorf("nenhuma configuração '%s' encontrada no exevo.yaml", resourceType)
-		}
-
-		var rawList []interface{}
-
-		switch resourceType {
-		case "rds":
-			instances, err := provider.FetchRDSInstances(cmd.Context(), sharedAwsCfg)
-			if err != nil {
-				return err
-			}
-
-			rawList = make([]interface{}, len(instances))
-			for i, v := range instances {
-				rawList[i] = v
-			}
-		case "s3":
-			instances, err := provider.FetchBuckets(cmd.Context(), sharedAwsCfg)
-			if err != nil {
-				return err
-			}
-			rawList = instances
-
-		default:
-			return fmt.Errorf("provider '%s' ainda não implementado no código Go", resourceType)
-		}
-
-		resourceDataList, err := adapter.BatchToMap(rawList)
-		if err != nil {
-			return err
-		}
-
-		// 5. Filtro Dinâmico
-		filter, _ := cmd.Flags().GetString("filter")
-		var filteredList []adapter.ResourceData
-
-		if filter != "" {
-			for _, res := range resourceDataList {
-				// Usa a PrimaryKey definida no YAML para filtrar
-				if name, ok := res[resourceConfig.PrimaryKey].(string); ok {
-					if strings.Contains(name, filter) {
-						filteredList = append(filteredList, res)
-					}
-				}
-			}
-		} else {
-			filteredList = resourceDataList
-		}
-
-		if len(filteredList) == 0 {
-			return fmt.Errorf("nenhum recurso encontrado com o filtro '%s'", filter)
-		}
-
-		// 6. Geração de Arquivos
-		fmt.Printf("🚀 Gerando Terraform para %d recursos...\n", len(filteredList))
-
-		outputDir := filepath.Join("infra", resourceType)
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
-			return fmt.Errorf("falha ao criar diretório: %w", err)
-		}
-
-		// Nomes de arquivo dinâmicos
-		outputFile := filepath.Join(outputDir, "main.tf")
-		importFile := filepath.Join(outputDir, "imports.tf")
-
-		// Gera a Definição
-		if err := generator.GenerateGeneric(filteredList, resourceConfig, outputFile); err != nil {
-			return err
-		}
-
-		// Gera os Imports
-		fmt.Println("🔗 Gerando Imports Dinâmicos...")
-		if err := generator.GenerateGenericImport(filteredList, resourceConfig, importFile); err != nil {
-			return err
-		}
-
-		fmt.Printf("✅ Sucesso! Arquivos gerados:\n - %s\n - %s\n", outputFile, importFile)
-		return nil
-	},
+	RunE:  runGenerate,
 }
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
 	generateCmd.Flags().StringP("filter", "f", "", "Filtra recursos pelo nome")
+}
+
+func runGenerate(cmd *cobra.Command, args []string) error {
+	resourceType, _ := cmd.Flags().GetString("resource")
+	filter, _ := cmd.Flags().GetString("filter")
+
+	config, err := loadResourceConfig(resourceType)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("☁️  Buscando recursos do tipo '%s' na AWS...\n", resourceType)
+	rawResources, err := fetchResources(cmd.Context(), resourceType)
+	if err != nil {
+		return err
+	}
+	resourceDateList, err := adapter.BatchToMap(rawResources)
+	if err != nil {
+		return fmt.Errorf("erro ao adaptar recursos: %w", err)
+	}
+
+	filteredList := applyFilter(resourceDateList, config.PrimaryKey, filter)
+	if len(filteredList) == 0 {
+		return fmt.Errorf("nenhum recurso encontrado com o filtro '%s'", filter)
+	}
+
+	return writeOutput(filteredList, config, resourceType)
+}
+
+func loadResourceConfig(resType string) (configuration.Resource, error) {
+	fmt.Println("📖 Lendo exevo.yaml...")
+	cfg, err := configuration.Load("exevo.yaml")
+	if err != nil {
+		return configuration.Resource{}, fmt.Errorf("falha ao ler config: %w", err)
+	}
+
+	resConfig, ok := cfg.Resources[resType]
+	if !ok {
+		return configuration.Resource{}, fmt.Errorf("configuração '%s' não encontrada no exevo.yaml", resType)
+	}
+	return resConfig, nil
+}
+
+func fetchResources(ctx context.Context, resType string) ([]interface{}, error) {
+	switch resType {
+	case "rds":
+		instances, err := provider.FetchRDSInstances(ctx, sharedAwsCfg)
+		if err != nil {
+			return nil, err
+		}
+
+		list := make([]interface{}, len(instances))
+		for i, v := range instances {
+			list[i] = v
+		}
+		return list, nil
+
+	case "s3":
+		return provider.FetchBuckets(ctx, sharedAwsCfg)
+
+	default:
+		return nil, fmt.Errorf("provider '%s' ainda não implementado via código", resType)
+	}
+}
+
+func applyFilter(list []adapter.ResourceData, key, filter string) []adapter.ResourceData {
+	if filter == "" {
+		return list
+	}
+
+	var filtered []adapter.ResourceData
+	for _, item := range list {
+		// Type assertion segura
+		if name, ok := item[key].(string); ok {
+			if strings.Contains(name, filter) {
+				filtered = append(filtered, item)
+			}
+		}
+	}
+	return filtered
+}
+
+func writeOutput(list []adapter.ResourceData, config configuration.Resource, resType string) error {
+	fmt.Printf("🚀 Gerando Terraform para %d recursos...\n", len(list))
+
+	outputDir := filepath.Join("infra", resType)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("falha ao criar diretório output: %w", err)
+	}
+
+	mainFile := filepath.Join(outputDir, "main.tf")
+	importsFile := filepath.Join(outputDir, "imports.tf")
+
+	// Gera Definição
+	if err := generator.GenerateGeneric(list, config, mainFile); err != nil {
+		return fmt.Errorf("erro ao gerar main.tf: %w", err)
+	}
+
+	// Gera Imports
+	fmt.Println("🔗 Gerando Imports Dinâmicos...")
+	if err := generator.GenerateGenericImport(list, config, importsFile); err != nil {
+		return fmt.Errorf("erro ao gerar imports.tf: %w", err)
+	}
+
+	fmt.Printf("✅ Sucesso! Arquivos gerados:\n - %s\n - %s\n", mainFile, importsFile)
+	return nil
 }
