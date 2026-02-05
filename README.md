@@ -22,50 +22,51 @@ O **Exevo Terra** é uma CLI escrita em Go projetada para engenheiros de SRE e D
 - **SSO Nativo**: Suporte transparente para autenticação via AWS SSO (`aws sso login`).
 - **Null Safety**: Camada de adaptação robusta que protege contra falhas de ponteiros da API da AWS.
 
-## 📦 Instalação
+# 🚀 Instalação
+
+### Opção 1: Via Go (Para Desenvolvedores)
+Se você já tem o Go instalado:
 
 ```bash
-# Via Go Install (Recomendado)
 go install [github.com/joaomortani/exevo-terra@latest](https://github.com/joaomortani/exevo-terra@latest)
-
-# Verifique a instalação
-exevo-terra --help
 ```
 
-## ⚡ Quick Start
+### Opção 2: Binário (Para todos)
+1. Vá na aba [Releases](../../releases) deste repositório.
+2. Baixe a versão compatível com seu sistema (Ex: `Linux_x86_64` ou `Darwin_arm64` para Mac M1/M2).
+3. Descompacte e mova para o seu path:
+   ```bash
+   tar -xvf exevo-terra_*.tar.gz
+   sudo mv exevo-terra /usr/local/bin/
+   ```
 
-1. Listar Recursos (Dry Run)
-Veja o que o Exevo Terra consegue enxergar na sua conta:
+## ⚡ Como Usar (Quickstart)
 
-```bash
-exevo-terra rds list --region us-east-1 --profile meu-perfil-sso
-```
+1. **Inicialize o projeto:**
+   ```bash
+   exevo-terra init
+   ```
 
-2. Gerar Código e Imports
-Gere os arquivos .tf e imports.tf para trazer os recursos para o seu state:
+2. **Edite o arquivo gerado:**
+   Abra o `exevo.yaml` e ajuste o nome do bucket e as configurações do S3/RDS.
 
-```bash
-exevo-terra rds generate --filter "nome-do-app" --profile meu-perfil-sso
-```
+3. **Descubra os campos (Opcional):**
+   Descubra quais campos da AWS você pode mapear no seu YAML:
+   ```bash
+   exevo-terra docs --resource rds
+   ```
 
-Isso criará:
-
-rds.tf: A definição do módulo.
-
-imports.tf: O mapeamento para o Terraform importar o state.
-
-3. Aplicar
-```bash
-terraform init
-terraform plan # Verifique se o plan indica "Importing..."
-terraform apply
-```
+4. **Gere o código:**
+   Conecte na AWS e gere os arquivos Terraform:
+   ```bash
+   exevo-terra generate --resource rds --profile default
+   ```
 
 ## 🗺️ Roadmap & Futuro
 > O Exevo Terra está evoluindo de uma ferramenta "Opinionated" para um motor de IaC genérico.
 
 - [x] **v0.1 (Atual):** Suporte focado em RDS com módulos padrão.
-- [ ] **v0.2 (Em Desenvolvimento):** Arquitetura "Bring Your Own Module" (BYOM).
+- [x] **v0.2 (Atual):** Arquitetura "Bring Your Own Module" (BYOM).
     - Suporte a configuração via YAML (`exevo.yaml`).
     - Mapeamento dinâmico de campos da AWS para Variáveis do Terraform.
     - Independência de Provider (suporte futuro a S3, ElastiCache, etc).
